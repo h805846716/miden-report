@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="zh" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-lang-key="pageTitle">Miden: 边缘区块链交互式报告</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Chosen Palette: Warm Neutrals with Blue/Green Accents -->
+    <!-- Application Structure Plan: A single-page application with a sticky top navigation for easy access to key thematic sections. The structure is designed to guide the user from a high-level vision to technical details, then to ecosystem and practical applications. It uses interactive tabs for dense technical sections (like Core Architecture) to prevent information overload and improve usability. Interactive diagrams and charts are used to make complex concepts like the Actor Model and performance trade-offs understandable. The flow is: Vision -> Core Challenges -> Interactive Architecture Deep-Dive (VM & Actor Model) -> Competitive Advantages -> Roadmap & Ecosystem -> Use Cases. This non-linear, navigable structure is chosen over the report's linear format to empower user-led exploration. -->
+    <!-- Visualization & Content Choices: 
+        -   Paradigm Shift Diagram: Goal: Compare. Method: HTML/CSS side-by-side diagram. Justification: Clearly contrasts the old vs. new model without complex graphics. Confirmed NO SVG/Mermaid.
+        -   VM Performance Chart: Goal: Compare. Method: Horizontal Bar Chart (Chart.js/Canvas) with a logarithmic scale. Justification: Best for showing vast differences between proof generation and verification times. Confirmed NO SVG.
+        -   Actor Model Transaction Flow: Goal: Organize/Explain Process. Method: Interactive HTML/CSS diagram. A button triggers a JS animation. Justification: Actively engages the user to demonstrate the async message passing via "notes". Confirmed NO SVG/Mermaid.
+        -   Competitive Radar Chart: Goal: Compare. Method: Radar Chart (Chart.js/Canvas). Justification: Provides an effective multi-axial comparison of Miden vs. other blockchain types on key metrics like scalability and privacy. Confirmed NO SVG.
+        -   Roadmap Timeline: Goal: Change. Method: Interactive HTML/CSS vertical timeline. JS highlights milestones on click/scroll. Justification: A clean, user-friendly way to present chronological data. Confirmed NO SVG/Mermaid.
+        -   Tables & Lists: Goal: Organize/Inform. Method: Styled HTML tables and lists. Justification: Direct, clear presentation of structured data like VM features and competitive analysis from the report. Confirmed NO SVG/Mermaid.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+            color: #334155; /* slate-700 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container { height: 350px; }
+        }
+        .nav-link {
+            transition: color 0.3s, border-color 0.3s;
+        }
+        .nav-link.active {
+            color: #0d9488; /* teal-600 */
+            border-bottom-color: #0d9488;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -2px rgb(0 0 0 / 0.05);
+        }
+        .tab.active {
+            background-color: #0d9488;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        #note-animation {
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Sticky Header -->
+    <header id="main-header" class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-slate-800" data-lang-key="headerTitle">Miden 报告</h1>
+                </div>
+                <div class="flex items-center">
+                    <div class="hidden md:block">
+                        <div class="ml-10 flex items-baseline space-x-4">
+                            <a href="#vision" class="nav-link text-slate-600 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-transparent" data-lang-key="navVision">愿景</a>
+                            <a href="#architecture" class="nav-link text-slate-600 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-transparent" data-lang-key="navArchitecture">核心架构</a>
+                            <a href="#advantages" class="nav-link text-slate-600 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-transparent" data-lang-key="navAdvantages">关键优势</a>
+                            <a href="#roadmap" class="nav-link text-slate-600 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-transparent" data-lang-key="navRoadmap">路线图</a>
+                            <a href="#use-cases" class="nav-link text-slate-600 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-transparent" data-lang-key="navUseCases">应用场景</a>
+                        </div>
+                    </div>
+                    <button id="lang-toggle-btn" class="ml-4 bg-teal-500 text-white text-sm font-semibold py-1 px-3 rounded-md hover:bg-teal-600 transition">English</button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Section 1: Vision -->
+        <section id="vision" class="pt-20 -mt-16">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-teal-700" data-lang-key="visionTitle">边缘区块链的愿景</h2>
+                <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto" data-lang-key="visionIntro">Miden通过将计算从网络中心转移到用户设备（边缘），从根本上重新定义了区块链的执行范式，旨在解决可扩展性、隐私和可用性的核心挑战。</p>
+            </div>
+            <div class="card p-6 md:p-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div class="p-6 bg-slate-50 rounded-lg">
+                        <h3 class="font-bold text-xl mb-4 text-center text-red-600" data-lang-key="traditionalModelTitle">传统模型：网络重执行</h3>
+                        <p class="text-slate-500 text-center mb-4" data-lang-key="traditionalModelDesc">所有交易都在每个网络节点上重新执行，造成瓶颈和数据冗余。</p>
+                        <div class="flex flex-col items-center space-y-2 text-sm text-center">
+                            <div class="font-mono p-3 rounded-lg w-full bg-red-100 text-red-800" data-lang-key="traditionalStep1">1. 用户提交交易</div>
+                            <div class="text-xl text-red-400">⬇</div>
+                            <div class="font-mono p-3 rounded-lg w-full bg-red-100 text-red-800" data-lang-key="traditionalStep2">2. 全网节点重新执行</div>
+                            <div class="text-xl text-red-400">⬇</div>
+                            <div class="font-mono p-3 rounded-lg w-full bg-red-100 text-red-800" data-lang-key="traditionalStep3">3. 状态公开，扩展受限</div>
+                        </div>
+                    </div>
+                    <div class="p-6 bg-teal-50 rounded-lg">
+                        <h3 class="font-bold text-xl mb-4 text-center text-teal-700" data-lang-key="midenModelTitle">Miden模型：边缘执行</h3>
+                        <p class="text-slate-500 text-center mb-4" data-lang-key="midenModelDesc">用户在本地执行并生成ZK证明，网络仅需验证证明，实现隐私和并行处理。</p>
+                        <div class="flex flex-col items-center space-y-2 text-sm text-center">
+                            <div class="font-mono p-3 rounded-lg w-full bg-teal-100 text-teal-800" data-lang-key="midenStep1">1. 用户在客户端执行</div>
+                            <div class="text-xl text-teal-400">⬇</div>
+                            <div class="font-mono p-3 rounded-lg w-full bg-teal-100 text-teal-800" data-lang-key="midenStep2">2. 生成零知识证明 (STARK)</div>
+                             <div class="text-xl text-teal-400">⬇</div>
+                            <div class="font-mono p-3 rounded-lg w-full bg-teal-100 text-teal-800" data-lang-key="midenStep3">3. 网络验证证明，隐私默认</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <hr class="my-16 border-slate-200">
+
+        <!-- Section 2: Core Architecture -->
+        <section id="architecture" class="pt-20 -mt-16">
+             <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-teal-700" data-lang-key="architectureTitle">核心技术架构</h2>
+                <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto" data-lang-key="architectureIntro">Miden的创新能力源于其两大技术支柱：专为ZK优化的Miden VM，以及实现并发与私密通信的Actor模型。点击下方标签页，探索其内部工作原理。</p>
+            </div>
+            <div class="card p-6 md:p-8">
+                <div class="mb-6 flex justify-center border-b border-slate-200">
+                    <button class="tab active px-4 py-2 text-sm font-semibold text-slate-600 rounded-t-md" onclick="switchTab('vm')" data-lang-key="tabVm">Miden VM</button>
+                    <button class="tab px-4 py-2 text-sm font-semibold text-slate-600 rounded-t-md" onclick="switchTab('actor')" data-lang-key="tabActor">Actor 模型</button>
+                </div>
+
+                <!-- VM Tab -->
+                <div id="tab-vm" class="tab-content active">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-slate-800" data-lang-key="vmTitle">Miden虚拟机 (VM)</h3>
+                            <p class="text-slate-600 mb-4" data-lang-key="vmDesc1">Miden VM是一个基于STARK的零知识虚拟机，是Miden的核心。它能够为在其上执行的任何程序自动生成基于STARK的执行证明，其指令集（ISA）和组件（小芯片）专为高效证明而设计。</p>
+                            <p class="text-slate-600" data-lang-key="vmDesc2">此图表揭示了STARK系统的一个关键权衡：证明生成是计算密集型任务，被转移到客户端；而验证则快如闪电，由网络高效处理。</p>
+                            <div class="chart-container">
+                                <canvas id="vmPerformanceChart"></canvas>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-slate-800" data-lang-key="vmFeaturesTitle">Miden VM 主要特性和功能</h3>
+                            <ul class="list-disc list-inside text-slate-600 space-y-3" data-lang-key="vmFeaturesList">
+                                <li><strong>流程控制：</strong> 图灵完备，支持条件语句、循环（无嵌套或迭代限制），实现复杂逻辑和高级智能合约。</li>
+                                <li><strong>内存管理：</strong> 读写随机存取内存，支持u32操作，实现高效的数据处理和基本计算。</li>
+                                <li><strong>密码学原语：</strong> 内置哈希（Rescue Prime Optimized）、Merkle路径验证，确保数据完整性、高效状态管理。</li>
+                                <li><strong>可编程性：</strong> 支持子程序（Procedures），非确定性编程，提高代码模块化，加速计算，支持秘密输入和隐私。</li>
+                                <li><strong>扩展性：</strong> 支持外部库（Miden stdlib），可定制主机，扩展VM功能，连接外部数据源，适应特定用例。</li>
+                                <li><strong>性能优化：</strong> 专用小芯片（Chiplets）用于哈希、位操作等，优化特定复杂计算的性能。</li>
+                                <li><strong>未来增强：</strong> 递归证明，改进调试，支持错误执行证明，启用无限递归应用，提升开发体验，增强系统鲁棒性。</li>
+                            </ul>
+                            <h3 class="text-xl font-bold mt-6 mb-4 text-slate-800" data-lang-key="vmNondeterminismTitle">非确定性编程和可定制主机</h3>
+                            <p class="text-slate-600" data-lang-key="vmNondeterminismDesc">Miden VM支持非确定性编程，允许证明者在VM外部执行额外工作并提供“执行提示”，以显著加速计算或提供秘密输入。这直接支持Miden的隐私目标，即允许机密数据保持链下，同时其完整性得到证明。可定制主机则允许与外部数据源（如预言机或传统数据库）无缝集成，这对于需要外部上下文的实际应用至关重要。这些功能是构建新一代复杂、隐私保护型去中心化应用的关键推动因素。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actor Model Tab -->
+                <div id="tab-actor" class="tab-content">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-slate-800" data-lang-key="actorModelTitle">Actor 模型、账户和笔记</h3>
+                             <p class="text-slate-600 mb-4" data-lang-key="actorModelDesc1">Miden采用Actor模型，其中“账户”是独立的状态机。它们通过异步的“笔记”进行通信和资产转移。这种模式天然支持并行处理，是Miden高吞吐量的关键。</p>
+                             <p class="text-slate-600 mb-2" data-lang-key="actorModelDesc2">下面的交互式图表演示了一笔交易的生命周期：</p>
+                             <ul class="list-disc list-inside text-sm text-slate-500 space-y-1 mb-4" data-lang-key="actorModelList">
+                                <li>账户A创建一张包含资产和消费规则的“笔记”。</li>
+                                <li>笔记的承诺被发布到网络。</li>
+                                <li>账户B获取笔记信息（通过链下方式），并消费它。</li>
+                             </ul>
+                             <button id="run-animation-btn" class="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 transition" data-lang-key="runAnimationBtn">运行交易模拟</button>
+                        </div>
+                        <div class="bg-slate-100 p-6 rounded-lg h-full flex flex-col justify-center relative overflow-hidden">
+                             <div class="flex justify-between items-center text-center">
+                                <div id="actor-a" class="z-10">
+                                    <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg"><span class="text-4xl">👤</span></div>
+                                    <p class="mt-2 font-semibold" data-lang-key="actorA">账户A</p>
+                                </div>
+                                <div id="actor-b" class="z-10">
+                                    <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg"><span class="text-4xl">🏢</span></div>
+                                    <p class="mt-2 font-semibold" data-lang-key="actorB">账户B</p>
+                                </div>
+                            </div>
+                            <div id="note-animation" class="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 z-20 opacity-0">
+                                <div class="bg-amber-400 p-3 rounded-lg shadow-xl text-center">
+                                    <span class="text-2xl">📝</span>
+                                    <p class="text-xs font-mono text-amber-900" data-lang-key="noteText">笔记</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <hr class="my-16 border-slate-200">
+
+        <!-- Section 3: Advantages -->
+        <section id="advantages" class="pt-20 -mt-16">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-teal-700" data-lang-key="advantagesTitle">Miden 的独特价值主张</h2>
+                <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto" data-lang-key="advantagesIntro">Miden并非简单的技术改进，而是一种连贯的架构哲学。它通过独特的组合，在竞争激烈的Layer 2领域中开辟了专注于隐私和高性能应用的利基市场。</p>
+            </div>
+            <div class="card p-6 md:p-8">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 text-slate-800" data-lang-key="comparisonTitle">多维度对比</h3>
+                        <p class="text-slate-600 mb-4" data-lang-key="comparisonDesc">与传统L1和其他L2相比，Miden在<span class="font-bold">可扩展性</span>和<span class="font-bold">默认隐私</span>方面表现突出，这得益于其边缘执行模型。同时，通过计划支持Rust/WASM和内置的账户抽象功能，它也致力于提供卓越的<span class="font-bold">开发者和用户体验</span>。</p>
+                        <p class="text-slate-600" data-lang-key="comparisonStarkDesc">STARK证明系统则为其带来了<span class="font-bold">无需可信设置</span>和<span class="font-bold">长期安全性</span>（抗量子）的优势。</p>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="advantagesChart"></canvas>
+                    </div>
+                </div>
+                <div class="mt-8">
+                    <h3 class="text-xl font-bold mb-4 text-slate-800" data-lang-key="uspTitle">Miden 的独特卖点 (USP)</h3>
+                    <ul class="list-disc list-inside text-slate-600 space-y-2" data-lang-key="uspList">
+                        <li><span class="font-bold">边缘执行和自托管状态：</span> 用户在本地证明，网络验证紧凑证明，最大限度地减少状态膨胀和重新执行，这是可扩展性和隐私的核心区别。</li>
+                        <li><span class="font-bold">默认隐私：</span> 通过客户端执行和基于承诺的状态实现固有隐私，支持机密交易和隐藏账户状态。</li>
+                        <li><span class="font-bold">高吞吐量和并行执行：</span> Actor模型和笔记系统促进并发交易，显著提高吞吐量。</li>
+                        <li><span class="font-bold">开发者友好（Rust/WASM）：</span> 支持熟悉的语言降低了复杂DApp的进入门槛。</li>
+                        <li><span class="font-bold">增强的用户体验：</span> 可撤销交易、社交恢复、灵活费用等功能解决了常见的Web3痛点。</li>
+                        <li><span class="font-bold">继承以太坊安全性：</span> Miden受益于以太坊强大的安全性。</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <hr class="my-16 border-slate-200">
+
+        <!-- Section 4: Roadmap & Ecosystem -->
+        <section id="roadmap" class="pt-20 -mt-16">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-teal-700" data-lang-key="roadmapTitle">生态系统与2025年路线图</h2>
+                <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto" data-lang-key="roadmapIntro">Miden拥有强大的战略支持和清晰的发展路径，所有努力都指向一个共同的目标：在2025年第四季度成功启动主网。</p>
+            </div>
+            <div class="card p-6 md:p-8">
+                <h3 class="text-xl font-bold text-center mb-6 text-slate-800" data-lang-key="partnershipsTitle">战略伙伴关系与资金</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center mb-10">
+                    <div class="bg-slate-50 p-4 rounded-lg shadow-sm">
+                        <p class="font-semibold text-lg text-teal-700" data-lang-key="lambdaClassTitle">LambdaClass 合作</p>
+                        <p class="text-sm text-slate-600" data-lang-key="lambdaClassDesc">超过18个月的深入合作，涉及客户端、协议、节点和编译器开发。</p>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-lg shadow-sm">
+                        <p class="font-semibold text-lg text-teal-700" data-lang-key="polygonIntegrationTitle">Polygon 生态集成</p>
+                        <p class="text-sm text-slate-600" data-lang-key="polygonIntegrationDesc">作为Polygon Layer 2解决方案的关键组成部分，专注于高吞吐量和私有DApp。</p>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-lg shadow-sm">
+                        <p class="font-semibold text-lg text-teal-700" data-lang-key="fundingTitle">2500万美元种子轮融资</p>
+                        <p class="text-sm text-slate-600" data-lang-key="fundingDesc">由a16z crypto、1kx和Hack VC领投，显示出机构的强大信心。</p>
+                    </div>
+                </div>
+
+                <h3 class="text-xl font-bold text-center mb-8 text-slate-800" data-lang-key="mainnetRoadmapTitle">通往主网之路</h3>
+                <div class="relative w-full max-w-3xl mx-auto">
+                    <!-- The connecting line -->
+                    <div class="absolute left-1/2 -ml-0.5 w-1 h-full bg-teal-200"></div>
+                    <!-- Timeline items -->
+                    <div id="timeline-container" class="space-y-16">
+                        <!-- JS will populate this -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <hr class="my-16 border-slate-200">
+
+        <!-- Section 5: Use Cases -->
+        <section id="use-cases" class="pt-20 -mt-16">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-teal-700" data-lang-key="useCasesTitle">释放新的应用可能性</h2>
+                <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto" data-lang-key="useCasesIntro">Miden的高性能和隐私保护特性，为DeFi、游戏、企业解决方案等领域开辟了前所未有的机遇，有望解锁一系列目前难以实现的新型应用。</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="card p-6 text-center">
+                    <div class="text-5xl mb-4">🛡️</div>
+                    <h3 class="font-bold text-xl text-slate-800 mb-2" data-lang-key="defiTitle">私密DeFi</h3>
+                    <p class="text-slate-600" data-lang-key="defiDesc">实现机密交易、私有订单簿和隐藏头寸，从根本上防止抢先交易（MEV）等问题。</p>
+                </div>
+                <div class="card p-6 text-center">
+                    <div class="text-5xl mb-4">🎮</div>
+                    <h3 class="font-bold text-xl text-slate-800 mb-2" data-lang-key="gamesTitle">复杂链上游戏</h3>
+                    <p class="text-slate-600" data-lang-key="gamesDesc">支持不完全信息游戏（如策略游戏），保护玩家意图，并实现复杂的游戏内经济逻辑。</p>
+                </div>
+                <div class="card p-6 text-center">
+                    <div class="text-5xl mb-4">🏢</div>
+                    <h3 class="font-bold text-xl text-slate-800 mb-2" data-lang-key="enterpriseTitle">企业级应用</h3>
+                    <p class="text-slate-600" data-lang-key="enterpriseDesc">运行机密业务逻辑（如供应链、金融结算），同时保证对审计员的完全可验证性。</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="text-center mt-12 mb-8 px-4">
+        <p class="text-slate-500 text-sm" data-lang-key="footerText">此交互式报告基于公开技术文档生成。Miden项目仍在积极开发中，信息可能随时间更新。</p>
+        <p class="text-slate-500 text-sm mt-2" data-lang-key="madeBy">由 <a href="https://x.com/GXingPing" target="_blank" class="font-bold text-teal-600 hover:underline">金灰</a> 制作</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            let currentLanguage = 'zh'; // Default language
+            let vmPerformanceChartInstance = null; // Store Chart.js instance
+            let advantagesChartInstance = null; // Store Chart.js instance
+
+            const translationData = {
+                pageTitle: {
+                    zh: 'Miden: 边缘区块链交互式报告',
+                    en: 'Miden: Interactive Report on Edge Blockchain'
+                },
+                headerTitle: {
+                    zh: 'Miden 报告',
+                    en: 'Miden Report'
+                },
+                navVision: {
+                    zh: '愿景',
+                    en: 'Vision'
+                },
+                navArchitecture: {
+                    zh: '核心架构',
+                    en: 'Core Architecture'
+                },
+                navAdvantages: {
+                    zh: '关键优势',
+                    en: 'Key Advantages'
+                },
+                navRoadmap: {
+                    zh: '路线图',
+                    en: 'Roadmap'
+                },
+                navUseCases: {
+                    zh: '应用场景',
+                    en: 'Use Cases'
+                },
+                visionTitle: {
+                    zh: '边缘区块链的愿景',
+                    en: 'Vision of the Edge Blockchain'
+                },
+                visionIntro: {
+                    zh: 'Miden通过将计算从网络中心转移到用户设备（边缘），从根本上重新定义了区块链的执行范式，旨在解决可扩展性、隐私和可用性的核心挑战。',
+                    en: 'Miden fundamentally redefines the blockchain execution paradigm by shifting computation from the network\'s center to user devices (the edge), aiming to address core challenges of scalability, privacy, and usability.'
+                },
+                traditionalModelTitle: {
+                    zh: '传统模型：网络重执行',
+                    en: 'Traditional Model: Network Re-execution'
+                },
+                traditionalModelDesc: {
+                    zh: '所有交易都在每个网络节点上重新执行，造成瓶颈和数据冗余。',
+                    en: 'All transactions are re-executed on every network node, leading to bottlenecks and data redundancy.'
+                },
+                traditionalStep1: {
+                    zh: '1. 用户提交交易',
+                    en: '1. User submits transaction'
+                },
+                traditionalStep2: {
+                    zh: '2. 全网节点重新执行',
+                    en: '2. All network nodes re-execute'
+                },
+                traditionalStep3: {
+                    zh: '3. 状态公开，扩展受限',
+                    en: '3. Public state, limited scalability'
+                },
+                midenModelTitle: {
+                    zh: 'Miden模型：边缘执行',
+                    en: 'Miden Model: Edge Execution'
+                },
+                midenModelDesc: {
+                    zh: '用户在本地执行并生成ZK证明，网络仅需验证证明，实现隐私和并行处理。',
+                    en: 'Users execute locally and generate ZK proofs; the network only verifies proofs, enabling privacy and parallel processing.'
+                },
+                midenStep1: {
+                    zh: '1. 用户在客户端执行',
+                    en: '1. User executes on client'
+                },
+                midenStep2: {
+                    zh: '2. 生成零知识证明 (STARK)',
+                    en: '2. Generate Zero-Knowledge Proof (STARK)'
+                },
+                midenStep3: {
+                    zh: '3. 网络验证证明，隐私默认',
+                    en: '3. Network verifies proof, privacy by default'
+                },
+                architectureTitle: {
+                    zh: '核心技术架构',
+                    en: 'Core Technical Architecture'
+                },
+                architectureIntro: {
+                    zh: 'Miden的创新能力源于其两大技术支柱：专为ZK优化的Miden VM，以及实现并发与私密通信的Actor模型。点击下方标签页，探索其内部工作原理。',
+                    en: 'Miden\'s innovation stems from two technical pillars: the ZK-optimized Miden VM, and the Actor Model for concurrency and private communication. Click the tabs below to explore their inner workings.'
+                },
+                tabVm: {
+                    zh: 'Miden VM',
+                    en: 'Miden VM'
+                },
+                tabActor: {
+                    zh: 'Actor 模型',
+                    en: 'Actor Model'
+                },
+                vmTitle: {
+                    zh: 'Miden虚拟机 (VM)',
+                    en: 'Miden Virtual Machine (VM)'
+                },
+                vmDesc1: {
+                    zh: 'Miden VM是一个基于STARK的零知识虚拟机，是Miden的核心。它能够为在其上执行的任何程序自动生成基于STARK的执行证明，其指令集（ISA）和组件（小芯片）专为高效证明而设计。',
+                    en: 'The Miden VM is a STARK-based zero-knowledge virtual machine at the core of Miden. It automatically generates STARK-based execution proofs for any program executed on it, with an ISA and chiplets designed for efficient proving.'
+                },
+                vmDesc2: {
+                    zh: '此图表揭示了STARK系统的一个关键权衡：证明生成是计算密集型任务，被转移到客户端；而验证则快如闪电，由网络高效处理。',
+                    en: 'This chart reveals a key trade-off in STARK systems: proof generation is computationally intensive and offloaded to the client; while verification is lightning-fast and efficiently handled by the network.'
+                },
+                vmFeaturesTitle: {
+                    zh: 'Miden VM 主要特性和功能',
+                    en: 'Miden VM Key Features and Functions'
+                },
+                vmFeaturesList: {
+                    zh: `<li><strong>流程控制：</strong> 图灵完备，支持条件语句、循环（无嵌套或迭代限制），实现复杂逻辑和高级智能合约。</li>
+                                <li><strong>内存管理：</strong> 读写随机存取内存，支持u32操作，实现高效的数据处理和基本计算。</li>
+                                <li><strong>密码学原语：</strong> 内置哈希（Rescue Prime Optimized）、Merkle路径验证，确保数据完整性、高效状态管理。</li>
+                                <li><strong>可编程性：</strong> 支持子程序（Procedures），非确定性编程，提高代码模块化，加速计算，支持秘密输入和隐私。</li>
+                                <li><strong>扩展性：：</strong> 支持外部库（Miden stdlib），可定制主机，扩展VM功能，连接外部数据源，适应特定用例。</li>
+                                <li><strong>性能优化：</strong> 专用小芯片（Chiplets）用于哈希、位操作等，优化特定复杂计算的性能。</li>
+                                <li><strong>未来增强：</strong> 递归证明，改进调试，支持错误执行证明，启用无限递归应用，提升开发体验，增强系统鲁棒性。</li>`,
+                    en: `<li><strong>Flow Control:</strong> Turing complete, supporting conditional statements, loops (no nesting or iteration limits), enabling complex logic and advanced smart contracts.</li>
+                                <li><strong>Memory Management:</strong> Read/write random access memory, supporting u32 operations for efficient data processing and basic computations.</li>
+                                <li><strong>Cryptographic Primitives:</strong> Built-in hashing (Rescue Prime Optimized), Merkle path verification, ensuring data integrity and efficient state management.</li>
+                                <li><strong>Programmability:</strong> Supports sub-procedures, non-determinism, improving code modularity, accelerating computation, and enabling secret inputs and privacy.</li>
+                                <li><strong>Extensibility:</strong> Supports external libraries (Miden stdlib), customizable host, extending VM functionality, connecting external data sources, adapting to specific use cases.</li>
+                                <li><strong>Performance Optimization:</strong> Dedicated chiplets for hashing, bitwise operations, etc., optimizing performance for specific complex computations.</li>
+                                <li><strong>Future Enhancements:</strong> Recursive proofs, improved debugging, support for faulty execution proofs, enabling infinitely recursive applications, enhancing developer experience and system robustness.</li>`
+                },
+                vmNondeterminismTitle: {
+                    zh: '非确定性编程和可定制主机',
+                    en: 'Non-Deterministic Programming and Customizable Host'
+                },
+                vmNondeterminismDesc: {
+                    zh: 'Miden VM支持非确定性编程，允许证明者在VM外部执行额外工作并提供“执行提示”，以显著加速计算或提供秘密输入。这直接支持Miden的隐私目标，即允许机密数据保持链下，同时其完整性得到证明。可定制主机则允许与外部数据源（如预言机或传统数据库）无缝集成，这对于需要外部上下文的实际应用至关重要。这些功能是构建新一代复杂、隐私保护型去中心化应用的关键推动因素。',
+                    en: 'Miden VM supports non-deterministic programming, allowing provers to perform extra work outside the VM and provide "execution hints" to significantly speed up computations or provide secret inputs. This directly supports Miden\'s privacy goals by allowing confidential data to remain off-chain while its integrity is proven. A customizable host allows seamless integration with external data sources (e.g., oracles or traditional databases), which is crucial for real-world applications requiring external context. These features are key enablers for building a new generation of complex, privacy-preserving decentralized applications.'
+                },
+                actorModelTitle: {
+                    zh: 'Actor 模型、账户和笔记',
+                    en: 'Actor Model, Accounts, and Notes'
+                },
+                actorModelDesc1: {
+                    zh: 'Miden采用Actor模型，其中“账户”是独立的状态机。它们通过异步的“笔记”进行通信和资产转移。这种模式天然支持并行处理，是Miden高吞吐量的关键。',
+                    en: 'Miden adopts the Actor Model, where "accounts" are independent state machines. They communicate and transfer assets via asynchronous "notes." This model inherently supports parallel processing and is key to Miden\'s high throughput.'
+                },
+                actorModelDesc2: {
+                    zh: '下面的交互式图表演示了一笔交易的生命周期：',
+                    en: 'The interactive diagram below demonstrates the lifecycle of a transaction:'
+                },
+                actorModelList: {
+                    zh: `<li>账户A创建一张包含资产和消费规则的“笔记”。</li>
+                                <li>笔记的承诺被发布到网络。</li>
+                                <li>账户B获取笔记信息（通过链下方式），并消费它。</li>`,
+                    en: `<li>Account A creates a "note" containing assets and consumption rules.</li>
+                                <li>The note\'s commitment is published to the network.</li>
+                                <li>Account B retrieves note information (via off-chain means) and consumes it.</li>`
+                },
+                runAnimationBtn: {
+                    zh: '运行交易模拟',
+                    en: 'Run Transaction Simulation'
+                },
+                actorA: {
+                    zh: '账户A',
+                    en: 'Account A'
+                },
+                actorB: {
+                    zh: '账户B',
+                    en: 'Account B'
+                },
+                noteText: {
+                    zh: '笔记',
+                    en: 'Note'
+                },
+                advantagesTitle: {
+                    zh: 'Miden 的独特价值主张',
+                    en: 'Miden\'s Unique Value Proposition'
+                },
+                advantagesIntro: {
+                    zh: 'Miden并非简单的技术改进，而是一种连贯的架构哲学。它通过独特的组合，在竞争激烈的Layer 2领域中开辟了专注于隐私和高性能应用的利基市场。',
+                    en: 'Miden is not merely a technical improvement but a coherent architectural philosophy. Through its unique combination, it carves out a niche in the competitive Layer 2 space, focusing on privacy and high-performance applications.'
+                },
+                comparisonTitle: {
+                    zh: '多维度对比',
+                    en: 'Multi-Dimensional Comparison'
+                },
+                comparisonDesc: {
+                    zh: '与传统L1和其他L2相比，Miden在<span class="font-bold">可扩展性</span>和<span class="font-bold">默认隐私</span>方面表现突出，这得益于其边缘执行模型。同时，通过计划支持Rust/WASM和内置的账户抽象功能，它也致力于提供卓越的<span class="font-bold">开发者和用户体验</span>。',
+                    en: 'Compared to traditional L1s and other L2s, Miden excels in <span class="font-bold">scalability</span> and <span class="font-bold">privacy by default</span>, thanks to its edge execution model. Additionally, with planned support for Rust/WASM and built-in account abstraction, it is committed to providing an exceptional <span class="font-bold">developer and user experience</span>.'
+                },
+                comparisonStarkDesc: {
+                    zh: 'STARK证明系统则为其带来了<span class="font-bold">无需可信设置</span>和<span class="font-bold">长期安全性</span>（抗量子）的优势。',
+                    en: 'The STARK proving system brings the advantages of <span class="font-bold">no trusted setup</span> and <span class="font-bold">long-term security</span> (quantum-resistant).'
+                },
+                uspTitle: {
+                    zh: 'Miden 的独特卖点 (USP)',
+                    en: 'Miden\'s Unique Selling Points (USP)'
+                },
+                uspList: {
+                    zh: `<li><span class="font-bold">边缘执行和自托管状态：</span> 用户在本地证明，网络验证紧凑证明，最大限度地减少状态膨胀和重新执行，这是可扩展性和隐私的核心区别。</li>
+                                <li><span class="font-bold">默认隐私：</span> 通过客户端执行和基于承诺的状态实现固有隐私，支持机密交易和隐藏账户状态。</li>
+                                <li><span class="font-bold">高吞吐量和并行执行：</span> Actor模型和笔记系统促进并发交易，显著提高吞吐量。</li>
+                                <li><span class="font-bold">开发者友好（Rust/WASM）：</span> 支持熟悉的语言降低了复杂DApp的进入门槛。</li>
+                                <li><span class="font-bold">增强的用户体验：</span> 可撤销交易、社交恢复、灵活费用等功能解决了常见的Web3痛点。</li>
+                                <li><span class="font-bold">继承以太坊安全性：</span> Miden受益于以太坊强大的安全性。</li>`,
+                    en: `<li><span class="font-bold">Edge Execution and Self-Custodied State:</span> Users prove locally, and the network verifies compact proofs, minimizing state bloat and re-execution—a core differentiator for scalability and privacy.</li>
+                                <li><span class="font-bold">Privacy by Default:</span> Inherent privacy through client-side execution and commitment-based state, supporting confidential transactions and hidden account states.</li>
+                                <li><span class="font-bold">High Throughput and Parallel Execution:</span> The Actor Model and note system facilitate concurrent transactions, significantly boosting throughput.</li>
+                                <li><span class="font-bold">Developer Friendly (Rust/WASM):</span> Support for familiar languages lowers the barrier to entry for complex DApp development.</li>
+                                <li><span class="font-bold">Enhanced User Experience:</span> Features like revocable transactions, social recovery, and flexible fees address common Web3 pain points.</li>
+                                <li><span class="font-bold">Inherited Ethereum Security:</span> Miden benefits from Ethereum's robust security.</li>`
+                },
+                roadmapTitle: {
+                    zh: '生态系统与2025年路线图',
+                    en: 'Ecosystem and 2025 Roadmap'
+                },
+                roadmapIntro: {
+                    zh: 'Miden拥有强大的战略支持和清晰的发展路径，所有努力都指向一个共同的目标：在2025年第四季度成功启动主网。',
+                    en: 'Miden boasts strong strategic backing and a clear development path, with all efforts converging on a single goal: a successful mainnet launch in Q4 2025.'
+                },
+                partnershipsTitle: {
+                    zh: '战略伙伴关系与资金',
+                    en: 'Strategic Partnerships and Funding'
+                },
+                lambdaClassTitle: {
+                    zh: 'LambdaClass 合作',
+                    en: 'LambdaClass Collaboration'
+                },
+                lambdaClassDesc: {
+                    zh: '超过18个月的深入合作，涉及客户端、协议、节点和编译器开发。',
+                    en: 'Over 18 months of deep collaboration, covering client, protocol, node, and compiler development.'
+                },
+                polygonIntegrationTitle: {
+                    zh: 'Polygon 生态集成',
+                    en: 'Polygon Ecosystem Integration'
+                },
+                polygonIntegrationDesc: {
+                    zh: '作为Polygon Layer 2解决方案的关键组成部分，专注于高吞吐量和私有DApp。',
+                    en: 'A key component of Polygon\'s Layer 2 scaling solutions, focused on high-throughput and private DApps.'
+                },
+                fundingTitle: {
+                    zh: '2500万美元种子轮融资',
+                    en: '25 Million USD Seed Round Funding'
+                },
+                fundingDesc: {
+                    zh: '由a16z crypto、1kx和Hack VC领投，显示出机构的强大信心。',
+                    en: 'Led by a16z crypto, 1kx, and Hack VC, demonstrating strong institutional confidence.'
+                },
+                mainnetRoadmapTitle: {
+                    zh: '通往主网之路',
+                    en: 'Path to Mainnet'
+                },
+                useCasesTitle: {
+                    zh: '释放新的应用可能性',
+                    en: 'Unlocking New Application Possibilities'
+                },
+                useCasesIntro: {
+                    zh: 'Miden的高性能和隐私保护特性，为DeFi、游戏、企业解决方案等领域开辟了前所未有的机遇，有望解锁一系列目前难以实现的新型应用。',
+                    en: 'Miden\'s high performance and privacy-preserving features open up unprecedented opportunities in DeFi, gaming, and enterprise solutions, promising to unlock a range of novel applications currently difficult to achieve.'
+                },
+                defiTitle: {
+                    zh: '私密DeFi',
+                    en: 'Private DeFi'
+                },
+                defiDesc: {
+                    zh: '实现机密交易、私有订单簿和隐藏头寸，从根本上防止抢先交易（MEV）等问题。',
+                    en: 'Enables confidential transactions, private order books, and hidden positions, fundamentally preventing issues like MEV.'
+                },
+                gamesTitle: {
+                    zh: '复杂链上游戏',
+                    en: 'Complex On-chain Games'
+                },
+                gamesDesc: {
+                    zh: '支持不完全信息游戏（如策略游戏），保护玩家意图，并实现复杂的游戏内经济逻辑。',
+                    en: 'Supports imperfect information games (e.g., strategy games), protecting player intent and enabling complex in-game economic logic.'
+                },
+                enterpriseTitle: {
+                    zh: '企业级应用',
+                    en: 'Enterprise Applications'
+                },
+                enterpriseDesc: {
+                    zh: '运行机密业务逻辑（如供应链、金融结算），同时保证对审计员的完全可验证性。',
+                    en: 'Runs confidential business logic (e.g., supply chain, financial settlements) while ensuring full verifiability for auditors.'
+                },
+                footerText: {
+                    zh: '此交互式报告基于公开技术文档生成。Miden项目仍在积极开发中，信息可能随时间更新。',
+                    en: 'This interactive report is based on publicly available technical documentation. The Miden project is under active development, and information may be subject to change.'
+                },
+                madeBy: {
+                    zh: '由 <a href="https://x.com/GXingPing" target="_blank" class="font-bold text-teal-600 hover:underline">金灰</a> 制作',
+                    en: 'Made by <a href="https://x.com/GXingPing" target="_blank" class="font-bold text-teal-600 hover:underline">Jinhui</a>'
+                }
+            };
+
+            // --- Data Store ---
+            const timelineData = [
+                { date_zh: '2025年 Q3初', event_zh: '账户增量、认证程序', date_en: 'Q3 2025 Early', event_en: 'Account Increments, Authentication Procedures', side: 'left' },
+                { date_zh: '2025年 Q3中', event_zh: '初始费用模型、惰性账户加载', date_en: 'Q3 2025 Mid', event_en: 'Initial Fee Model, Lazy Account Loading', side: 'right' },
+                { date_zh: '2025年 Q4初', event_zh: 'AggLayer集成、批处理内核', date_en: 'Q4 2025 Early', event_en: 'AggLayer Integration, Batching Kernel', side: 'left' },
+                { date_zh: '2025年 Q4末', event_zh: '主网启动', date_en: 'Q4 2025 Late', event_en: 'Mainnet Launch', side: 'right', highlight: true }
+            ];
+
+            const tooltipTitleCallback = (tooltipItems) => {
+                const item = tooltipItems[0];
+                let label = item.chart.data.labels[item.dataIndex];
+                if (Array.isArray(label)) {
+                    return label.join(' ');
+                }
+                return label;
+            };
+
+            // --- Chart Initializations ---
+            const initVmPerformanceChart = () => {
+                const ctx = document.getElementById('vmPerformanceChart')?.getContext('2d');
+                if (!ctx) return;
+
+                if (vmPerformanceChartInstance) {
+                    vmPerformanceChartInstance.destroy();
+                }
+
+                vmPerformanceChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: currentLanguage === 'zh' ? ['实际执行', '证明验证', ['证明生成', '(客户端)']] : ['Actual Execution', 'Proof Verification', ['Proof Generation', '(Client-side)']],
+                        datasets: [{
+                            label: currentLanguage === 'zh' ? '相对时间（对数尺度）' : 'Relative Time (Log Scale)',
+                            data: [0.1, 1, 1000],
+                            backgroundColor: ['#99f6e4', '#2dd4bf', '#f59e0b'],
+                            borderColor: ['#5eead4', '#14b8a6', '#d97706'],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'logarithmic',
+                                min: 0.01,
+                                max: 10000,
+                                title: { display: true, text: currentLanguage === 'zh' ? '相对时间单位 (对数)' : 'Relative Time Unit (Log)', color: '#475569' },
+                                grid: { color: '#e2e8f0' }
+                            },
+                            y: { grid: { display: false } }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { title: tooltipTitleCallback } }
+                        }
+                    }
+                });
+            };
+
+            const initAdvantagesChart = () => {
+                const ctx = document.getElementById('advantagesChart')?.getContext('2d');
+                if (!ctx) return;
+
+                if (advantagesChartInstance) {
+                    advantagesChartInstance.destroy();
+                }
+
+                advantagesChartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: currentLanguage === 'zh' ? ['可扩展性', '隐私性', ['开发者体验', '(DevEx)'], '安全性', ['用户体验', '(UserEx)']] : ['Scalability', 'Privacy', ['Developer Experience', '(DevEx)'], 'Security', ['User Experience', '(UserEx)']],
+                        datasets: [{
+                            label: currentLanguage === 'zh' ? 'Miden' : 'Miden',
+                            data: [9, 9, 8, 8, 9],
+                            fill: true,
+                            backgroundColor: 'rgba(20, 184, 166, 0.2)',
+                            borderColor: 'rgb(13, 148, 136)',
+                            pointBackgroundColor: 'rgb(13, 148, 136)',
+                        }, {
+                            label: currentLanguage === 'zh' ? '传统L1/L2' : 'Traditional L1/L2',
+                            data: [4, 3, 6, 7, 5],
+                            fill: true,
+                            backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                            borderColor: 'rgb(217, 119, 6)',
+                            pointBackgroundColor: 'rgb(217, 119, 6)',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: { color: '#e2e8f0' },
+                                grid: { color: '#e2e8f0' },
+                                pointLabels: { font: { size: 14 }, color: '#334155' },
+                                ticks: { backdropColor: 'rgba(255, 255, 255, 0.75)' },
+                                min: 0,
+                                max: 10
+                            }
+                        },
+                        plugins: {
+                            legend: { position: 'top', labels: { color: '#334155' } },
+                            tooltip: { callbacks: { title: tooltipTitleCallback } }
+                        }
+                    }
+                });
+            };
+
+            // --- UI Interaction Logic ---
+            const handleTabs = () => {
+                const tabs = document.querySelectorAll('.tab');
+                const contents = document.querySelectorAll('.tab-content');
+                
+                window.switchTab = (tabName) => {
+                    tabs.forEach(tab => {
+                        tab.classList.remove('active');
+                        if (tab.getAttribute('onclick').includes(tabName)) {
+                            tab.classList.add('active');
+                        }
+                    });
+                    contents.forEach(content => {
+                        content.classList.remove('active');
+                        if (content.id === `tab-${tabName}`) {
+                            content.classList.add('active');
+                        }
+                    });
+                };
+            };
+            
+            const handleActorAnimation = () => {
+                const btn = document.getElementById('run-animation-btn');
+                const note = document.getElementById('note-animation');
+                if (!btn || !note) return;
+                
+                btn.addEventListener('click', () => {
+                    note.style.transform = 'translate(-50%, -50%)';
+                    note.style.opacity = '0';
+                    note.classList.remove('left-[25%]', 'left-[75%]');
+                    
+                    // Start
+                    setTimeout(() => {
+                        note.style.opacity = '1';
+                        note.classList.add('left-[25%]');
+                    }, 100);
+
+                    // Move
+                    setTimeout(() => {
+                        note.classList.remove('left-[25%]');
+                        note.classList.add('left-[75%]');
+                    }, 1000);
+
+                    // End
+                    setTimeout(() => {
+                        note.style.opacity = '0';
+                    }, 2000);
+                });
+            };
+
+            const populateTimeline = () => {
+                const container = document.getElementById('timeline-container');
+                if (!container) return;
+                container.innerHTML = ''; // Clear existing content
+                
+                timelineData.forEach(item => {
+                    const isLeft = item.side === 'left';
+                    const highlightClass = item.highlight ? 'bg-amber-500 text-white' : 'bg-teal-500';
+                    const dateText = currentLanguage === 'zh' ? item.date_zh : item.date_en;
+                    const eventText = currentLanguage === 'zh' ? item.event_zh : item.event_en;
+
+                    const itemHtml = `
+                        <div class="flex items-center w-full">
+                            ${isLeft ? `
+                            <div class="w-1/2 flex justify-end">
+                                <div class="text-right pr-8">
+                                    <p class="font-bold text-teal-700">${dateText}</p>
+                                    <p class="text-slate-600">${eventText}</p>
+                                </div>
+                            </div>
+                            ` : '<div class="w-1/2"></div>'}
+                            
+                            <div class="relative">
+                                <div class="w-6 h-6 rounded-full ${highlightClass} shadow z-10 flex items-center justify-center">
+                                    ${item.highlight ? '<span class="text-lg">★</span>' : ''}
+                                </div>
+                            </div>
+
+                            ${!isLeft ? `
+                            <div class="w-1/2 flex justify-start">
+                                <div class="pl-8">
+                                    <p class="font-bold text-teal-700">${dateText}</p>
+                                    <p class="text-slate-600">${eventText}</p>
+                                </div>
+                            </div>
+                            ` : '<div class="w-1/2"></div>'}
+                        </div>
+                    `;
+                    container.innerHTML += itemHtml;
+                });
+            };
+
+            const handleScrollSpy = () => {
+                const sections = document.querySelectorAll('section');
+                const navLinks = document.querySelectorAll('.nav-link');
+                const headerHeight = document.getElementById('main-header').offsetHeight;
+
+                window.addEventListener('scroll', () => {
+                    let current = '';
+                    sections.forEach(section => {
+                        const sectionTop = section.offsetTop - headerHeight - 20; // 20px offset
+                        if (pageYOffset >= sectionTop) {
+                            current = section.getAttribute('id');
+                        }
+                    });
+
+                    navLinks.forEach(link => {
+                        link.classList.remove('active');
+                        if (link.getAttribute('href').substring(1) === current) {
+                            link.classList.add('active');
+                        }
+                    });
+                });
+            };
+
+            const updateLanguage = (lang) => {
+                currentLanguage = lang;
+                document.documentElement.lang = lang; // Update HTML lang attribute
+                document.getElementById('lang-toggle-btn').textContent = lang === 'zh' ? 'English' : '中文';
+
+                for (const key in translationData) {
+                    const element = document.querySelector(`[data-lang-key="${key}"]`);
+                    if (element) {
+                        element.innerHTML = translationData[key][lang];
+                    }
+                }
+                // Re-initialize charts to update labels
+                initVmPerformanceChart();
+                initAdvantagesChart();
+                // Re-populate timeline to update event texts
+                populateTimeline();
+            };
+
+            const langToggleButton = document.getElementById('lang-toggle-btn');
+            if (langToggleButton) {
+                langToggleButton.addEventListener('click', () => {
+                    updateLanguage(currentLanguage === 'zh' ? 'en' : 'zh');
+                });
+            }
+            
+            // --- Initializer ---
+            initVmPerformanceChart();
+            initAdvantagesChart();
+            handleTabs();
+            handleActorAnimation();
+            populateTimeline();
+            handleScrollSpy();
+            updateLanguage('zh'); // Initialize content in Chinese
+        });
+    </script>
+</body>
+</html>
